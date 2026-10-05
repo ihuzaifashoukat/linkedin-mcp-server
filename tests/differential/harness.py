@@ -114,6 +114,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import socket
@@ -172,7 +173,14 @@ from differential.baseline import (
     interpreter_failures,
     stage_frozen_session,
 )
-from differential.events import EventLog, read_jsonl
+from differential.events import (
+    OUTPUT_FILES,
+    OWNER_LOG_FILE,
+    CappedOutput,
+    EventLog,
+    keep_capped,
+    read_jsonl,
+)
 from differential.fault_overlay import events as fault_events
 from differential.fault_overlay import (
     publish_activation,
@@ -1122,6 +1130,56 @@ def watcher_failures(
     return failures
 
 
+#: The driver's own line, as written when its stderr is not a terminal:
+#: ``toISOString()``, a space, the ``pw:browser`` channel, a space. Measured
+#: on both locked drivers. A server record is JSON and starts with ``{``, so
+#: the channel token has to be here and not merely somewhere in the line: a
+#: Chrome path can contain the words ``pw:browser``.
+_DRIVER_LINE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z pw:browser(?:\s|$)"
+)
+#: What the driver did with the browser, a few lines per launch. The text
+#: file keeps its head, so an exit that follows a storm of browser output is
+#: past the cap; these are what that exit has to leave in the event log.
+_DRIVER_LIFECYCLE = (
+    "<launching>",
+    "<process did exit",
+    "<gracefully close start>",
+    "<kill>",
+    "<will force kill>",
+)
+
+
+def driver_diagnostic(line: str) -> bool:
+    """Whether *line* is the driver's browser log rather than the server's.
+
+    The ``<launching>`` line names the browser cache. A cache directory called
+    ``login`` matches the loss notice (``session._LOSS``), so a lost session
+    the server never mentioned would read as one it announced.
+    """
+    return _DRIVER_LINE.match(line) is not None
+
+
+def driver_lifecycle(line: str) -> bool:
+    """A driver line that says it launched, closed, killed or saw the exit."""
+    return driver_diagnostic(line) and any(
+        marker in line for marker in _DRIVER_LIFECYCLE
+    )
+
+
+def note_server_output(session: Any, line: str) -> None:
+    """Remember *line* as what the server showed, unless the driver wrote it.
+
+    Both lists are what a row classifies (``user_lines`` for who was told,
+    ``stderr`` for the server's own reports). The line still goes to the
+    evidence file through the caller's own callback.
+    """
+    if driver_diagnostic(line):
+        return
+    session.stderr.append(line)
+    session.user_lines.append(line)
+
+
 # --- Host stub ---------------------------------------------------------------
 
 
@@ -1618,8 +1676,7 @@ async def run_host_session(
     session = HostSession()
 
     def remember(line: str) -> None:
-        session.stderr.append(line)
-        session.user_lines.append(line)
+        note_server_output(session, line)
         on_stderr(line)
 
     transport = HostQuitTransport(
@@ -2289,8 +2346,7 @@ async def run_http_host_session(
     session = HostSession(transport=STREAMABLE_HTTP)
 
     def remember(line: str) -> None:
-        session.stderr.append(line)
-        session.user_lines.append(line)
+        note_server_output(session, line)
         on_stderr(line)
 
     host = HttpHost(
@@ -2399,8 +2455,7 @@ async def run_stub_host_session(
     session = HostSession()
 
     def remember(line: str) -> None:
-        session.stderr.append(line)
-        session.user_lines.append(line)
+        note_server_output(session, line)
         on_stderr(line)
 
     host = StubHost(command, env=env, cwd=cwd, on_stderr=remember)
@@ -7101,8 +7156,29 @@ async def measure_host_quit_row(
     #: preservation session alike.
     runtime_settings = dict(lifecycle.runtime_environment or {})
 
+    #: Every line a host's server or a profile command wrote, whole, by actor
+    #: (``events.OUTPUT_FILES``). A line from anything but the row's own host
+    #: is prefixed with the host, phase or command the record names.
+    outputs = {
+        actor: CappedOutput(work_dir / name) for actor, name in OUTPUT_FILES.items()
+    }
+
     def emit(actor: str, kind: str, **fields: Any) -> None:
-        log.emit(experiment=experiment, row=row, actor=actor, kind=kind, **fields)
+        # The browser's own output is one line per thing it prints, and the
+        # event log keeps every record, so that chatter goes to the capped
+        # file only. A launch, exit, close or kill is a few lines, and it is
+        # the line a storm pushes past the cap. A server line is recorded as
+        # before.
+        line = fields.get("line")
+        diagnostic = (
+            kind == "user.output" and isinstance(line, str) and driver_diagnostic(line)
+        )
+        if not diagnostic or driver_lifecycle(line):
+            log.emit(experiment=experiment, row=row, actor=actor, kind=kind, **fields)
+        output = outputs.get(actor)
+        if kind == "user.output" and output is not None and isinstance(line, str):
+            label = fields.get("host") or fields.get("phase") or fields.get("command")
+            output.line(f"[{label}] {line}" if label else line)
 
     if runtime.frozen:
         identity = frozen_identity(runtime)
@@ -9682,6 +9758,20 @@ async def measure_host_quit_row(
             )
         row_requests = list(origin.requests[request_mark:])
         row_decisions = list(proxy.decisions[decision_mark:])
+        # The owner's whole log, every owner of the row's in turn, taken last
+        # before the cleanup below removes the daemon directory it sits in.
+        # The event log has only its tail, and the browser's exit, crashed or
+        # killed, is near the start of a row. Nothing in the verdict reads it.
+        with contextlib.suppress(Exception):
+            from linkedin_mcp_server import daemon_owner
+
+            keep_capped(
+                Path(
+                    owner.get("log_path")
+                    or daemon_owner.daemon_log_path(account.auth_root)
+                ),
+                work_dir / OWNER_LOG_FILE,
+            )
         result.cleanup = retire_daemon_state(
             account, cleanup_owner if cleanup_owner is not None else identified
         )
