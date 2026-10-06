@@ -1979,8 +1979,11 @@ async def test_an_actor_past_the_cap_is_cut_and_says_so(row, monkeypatch, tmp_pa
 
     whole = "".join(f"{line}\n" for line in owner_lines).encode()
     copied = (target / OWNER_LOG_FILE).read_bytes()
-    assert copied.startswith(whole[:1000])
-    assert copied[1000:].lstrip().startswith(f"{marker} of {len(whole)}".encode())
+    # The budget is split in two: the first half, the marker, the last half.
+    half = 500
+    assert copied.startswith(whole[:half])
+    assert copied.endswith(whole[-half:])
+    assert f"the first {half} bytes of {len(whole)}".encode() in copied
 
 
 def test_the_owner_log_is_copied_as_bytes(tmp_path, monkeypatch):
@@ -1994,9 +1997,12 @@ def test_the_owner_log_is_copied_as_bytes(tmp_path, monkeypatch):
     destination = tmp_path / "owner.log"
     assert events.keep_capped(source, destination)
     copied = destination.read_bytes()
-    marker = b"[truncated by the differential harness: the first 1000 bytes"
-    assert copied.startswith(raw[:1000])
-    assert marker in copied[1000:]
+    half = 500
+    assert copied.startswith(raw[:half])
+    assert copied.endswith(raw[-half:])
+    assert f"the first {half} bytes".encode() in copied
+    # Head and tail share the budget. Keeping both in full would be twice the cap.
+    assert len(copied) <= 1000 + 200
 
 
 def test_an_exit_at_the_end_of_a_long_log_is_kept(tmp_path, monkeypatch):

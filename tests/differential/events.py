@@ -427,21 +427,23 @@ class CappedOutput:
 
 
 def keep_capped(source: Path, destination: Path, cap: int | None = None) -> bool:
-    """Copy *source* to *destination*, its first and last *cap* bytes.
+    """Copy *source* to *destination*, at most *cap* bytes.
 
-    A log that fits is copied whole. A longer one keeps its head and its tail
-    with a marker between them, because the line that matters can be at
-    either end: a browser that dies on launch writes its exit first, and one
-    that dies late writes it last. False when there was nothing to read; like
-    ``CappedOutput``, a failure is evidence lost and nothing else."""
+    A log that fits is copied whole. A longer one keeps the first half of the
+    budget and the last half, with a marker between them, because the line
+    that matters can be at either end: a browser that dies on launch writes
+    its exit first, and one that dies late writes it last. False when there
+    was nothing to read; like ``CappedOutput``, a failure is evidence lost
+    and nothing else."""
     cap = OUTPUT_CAP_BYTES if cap is None else cap
+    head_cap = cap // 2
     try:
         with source.open("rb") as handle:
-            head = handle.read(cap)
+            head = handle.read(head_cap)
             total = os.fstat(handle.fileno()).st_size
             tail = b""
             if total > cap:
-                handle.seek(max(cap, total - cap))
+                handle.seek(max(head_cap, total - (cap - head_cap)))
                 tail = handle.read()
     except OSError:
         return False
@@ -450,7 +452,7 @@ def keep_capped(source: Path, destination: Path, cap: int | None = None) -> bool
             handle.write(head)
             if tail:
                 marker = (
-                    f"[truncated by the differential harness: the first {cap} bytes "
+                    f"[truncated by the differential harness: the first {head_cap} bytes "
                     f"of {total} are kept, and its last {len(tail)}, the middle "
                     f"is not]\n"
                 )
