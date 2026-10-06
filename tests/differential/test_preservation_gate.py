@@ -1929,7 +1929,10 @@ async def _published_output(row, monkeypatch, tmp_path, host_lines, owner_lines)
     """Run a daemon row whose server writes *host_lines* to stderr and whose
     owner left *owner_lines* in its log, and publish its evidence."""
     log = _owner_log(monkeypatch, tmp_path)
-    log.write_text("".join(f"{line}\n" for line in owner_lines))
+    # Bytes, not text: the cap counts bytes, and a text write would turn
+    # "\n" into "\r\n" on Windows, so the copy would no longer start where
+    # the test says it does.
+    log.write_bytes("".join(f"{line}\n" for line in owner_lines).encode())
     original = harness.run_host_session
 
     async def host(*args, **kwargs):
@@ -1974,10 +1977,26 @@ async def test_an_actor_past_the_cap_is_cut_and_says_so(row, monkeypatch, tmp_pa
     assert kept[:-1] == host_lines[: 1000 // 15]
     assert kept[-1].startswith(marker)
 
-    whole = "".join(f"{line}\n" for line in owner_lines)
-    copied = (target / OWNER_LOG_FILE).read_text()
+    whole = "".join(f"{line}\n" for line in owner_lines).encode()
+    copied = (target / OWNER_LOG_FILE).read_bytes()
     assert copied.startswith(whole[:1000])
-    assert copied[1000:].strip().startswith(f"{marker} of {len(whole)}")
+    assert copied[1000:].lstrip().startswith(f"{marker} of {len(whole)}".encode())
+
+
+def test_the_owner_log_is_copied_as_bytes(tmp_path, monkeypatch):
+    # The cap is a byte count, and a Windows log ends its lines with "\r\n".
+    # A copy that reads the log as text would drop the carriage returns and
+    # cut at a different place.
+    monkeypatch.setattr(events, "OUTPUT_CAP_BYTES", 1000)
+    source = tmp_path / "daemon.log"
+    raw = "".join(f"owner line {n:04d}\r\n" for n in range(300)).encode("ascii")
+    source.write_bytes(raw)
+    destination = tmp_path / "owner.log"
+    assert events.keep_capped(source, destination)
+    copied = destination.read_bytes()
+    marker = b"[truncated by the differential harness: the first 1000 bytes"
+    assert copied.startswith(raw[:1000])
+    assert marker in copied[1000:]
 
 
 async def test_driver_diagnostics_fill_the_capped_file_and_not_the_event_log(
