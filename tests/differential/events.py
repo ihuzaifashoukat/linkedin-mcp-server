@@ -439,10 +439,14 @@ def keep_capped(source: Path, destination: Path, cap: int | None = None) -> bool
     head_cap = cap // 2
     try:
         with source.open("rb") as handle:
-            head = handle.read(head_cap)
+            # The whole log when it fits. Reading only the first half would
+            # drop the rest of a log between half and the whole budget, and
+            # drop it silently, with no marker.
+            head = handle.read(cap)
             total = os.fstat(handle.fileno()).st_size
             tail = b""
             if total > cap:
+                head = head[:head_cap]
                 handle.seek(max(head_cap, total - (cap - head_cap)))
                 tail = handle.read()
     except OSError:

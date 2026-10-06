@@ -2005,6 +2005,18 @@ def test_the_owner_log_is_copied_as_bytes(tmp_path, monkeypatch):
     assert len(copied) <= 1000 + 200
 
 
+def test_a_log_that_fits_is_copied_whole(tmp_path, monkeypatch):
+    # Between half and the whole budget. Copying only the first half would
+    # drop the rest and say nothing about it.
+    monkeypatch.setattr(events, "OUTPUT_CAP_BYTES", 1000)
+    source = tmp_path / "daemon.log"
+    raw = b"x" * 800
+    source.write_bytes(raw)
+    destination = tmp_path / "owner.log"
+    assert events.keep_capped(source, destination)
+    assert destination.read_bytes() == raw
+
+
 def test_an_exit_at_the_end_of_a_long_log_is_kept(tmp_path, monkeypatch):
     # The exit is the last line, and the cap keeps only the head. A copy that
     # drops the tail loses the one line it exists to keep.
