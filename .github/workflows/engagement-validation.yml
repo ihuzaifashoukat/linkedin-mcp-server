@@ -16,7 +16,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
+        ref: 3f38543c88a7b090c7a0afda39386b6c43c600d6
         persist-credentials: false
     - name: Set up uv
       uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
@@ -37,7 +37,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
+        ref: 3f38543c88a7b090c7a0afda39386b6c43c600d6
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
@@ -99,7 +99,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
+        ref: 3f38543c88a7b090c7a0afda39386b6c43c600d6
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
@@ -161,7 +161,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
+        ref: 3f38543c88a7b090c7a0afda39386b6c43c600d6
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
