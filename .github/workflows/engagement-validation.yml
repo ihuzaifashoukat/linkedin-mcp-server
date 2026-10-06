@@ -8,11 +8,12 @@ permissions:
 jobs:
   lint-and-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 67f0f11c2bd36e05654023f82804fc14dafe2456
+        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
         persist-credentials: false
     - name: Set up uv
       uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
@@ -24,16 +25,16 @@ jobs:
       uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd
     - name: Optimize uv cache for CI
       run: uv cache prune --ci
-    timeout-minutes: 60
   linux:
     name: Linux tests
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     env:
       FASTMCP_MCP_CAMELCASE_COMPAT: 'false'
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 67f0f11c2bd36e05654023f82804fc14dafe2456
+        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
@@ -79,10 +80,10 @@ jobs:
         name: validation-linux-results
         path: validation-*.xml
         if-no-files-found: warn
-    timeout-minutes: 60
   windows-daemon:
     name: Windows daemon (Python ${{ matrix.python-version }})
     runs-on: windows-latest
+    timeout-minutes: 15
     env:
       FASTMCP_MCP_CAMELCASE_COMPAT: 'false'
     strategy:
@@ -95,7 +96,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 67f0f11c2bd36e05654023f82804fc14dafe2456
+        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
@@ -138,13 +139,12 @@ jobs:
         if-no-files-found: ignore
         retention-days: 14
     - run: uv cache prune --ci
-    timeout-minutes: 60
   platform-behaviour:
     name: Platform behaviour (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     env:
       FASTMCP_MCP_CAMELCASE_COMPAT: 'false'
-    timeout-minutes: 40
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -158,7 +158,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 67f0f11c2bd36e05654023f82804fc14dafe2456
+        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
