@@ -5,6 +5,9 @@ name: Engagement PR full validation
     - validation/1259-complete-ci
 permissions:
   contents: read
+concurrency:
+  group: engagement-validation-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   lint-and-check:
     runs-on: ubuntu-latest
@@ -13,7 +16,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
+        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
         persist-credentials: false
     - name: Set up uv
       uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
@@ -34,7 +37,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
+        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
@@ -96,7 +99,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
+        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
@@ -158,7 +161,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
-        ref: 0a0eff2509e15f4b889f269a07adcb26f1a48a6c
+        ref: 4e9e2ee1c08648e7d39c4d8237ef0237673ada47
         persist-credentials: false
     - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
       with:
