@@ -1999,6 +1999,19 @@ def test_the_owner_log_is_copied_as_bytes(tmp_path, monkeypatch):
     assert marker in copied[1000:]
 
 
+def test_an_exit_at_the_end_of_a_long_log_is_kept(tmp_path, monkeypatch):
+    # The exit is the last line, and the cap keeps only the head. A copy that
+    # drops the tail loses the one line it exists to keep.
+    monkeypatch.setattr(events, "OUTPUT_CAP_BYTES", 1000)
+    source = tmp_path / "daemon.log"
+    body = "".join(f"owner line {n:04d}\n" for n in range(300)).encode("ascii")
+    exit_line = b"<process did exit: exitCode=3221225477, signal=null>\n"
+    source.write_bytes(body + exit_line)
+    destination = tmp_path / "owner.log"
+    assert events.keep_capped(source, destination)
+    assert destination.read_bytes().endswith(exit_line)
+
+
 async def test_browser_chatter_that_quotes_a_marker_stays_capped(
     row, monkeypatch, tmp_path
 ):

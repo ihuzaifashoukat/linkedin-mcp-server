@@ -927,8 +927,12 @@ jobs:
             Copy-Item -Path $dumps -Destination (Join-Path $out 'crash-dumps') -Recurse -Force
           }
           $crashpad = Join-Path $out 'crashpad'
+          # The newest, not the first found. Pytest keeps its last sessions,
+          # and the failing row is the latest one. The first 32 in directory
+          # order can all belong to earlier rows.
           Get-ChildItem -Path ([IO.Path]::GetTempPath()) -Directory -Filter 'pytest-of-*' -ErrorAction SilentlyContinue |
             Get-ChildItem -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
             Select-Object -First 32 |
             ForEach-Object {
               New-Item -ItemType Directory -Force -Path $crashpad | Out-Null
@@ -1702,8 +1706,12 @@ jobs:
             Copy-Item -Path $dumps -Destination (Join-Path $out 'crash-dumps') -Recurse -Force
           }
           $crashpad = Join-Path $out 'crashpad'
+          # The newest, not the first found. Pytest keeps its last sessions,
+          # and the failing row is the latest one. The first 32 in directory
+          # order can all belong to earlier rows.
           Get-ChildItem -Path ([IO.Path]::GetTempPath()) -Directory -Filter 'pytest-of-*' -ErrorAction SilentlyContinue |
             Get-ChildItem -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
             Select-Object -First 32 |
             ForEach-Object {
               New-Item -ItemType Directory -Force -Path $crashpad | Out-Null

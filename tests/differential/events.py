@@ -427,22 +427,35 @@ class CappedOutput:
 
 
 def keep_capped(source: Path, destination: Path, cap: int | None = None) -> bool:
-    """Copy *source* to *destination*, at most its first *cap* bytes and a
-    marker past them. False when there was nothing to read; like
+    """Copy *source* to *destination*, its first and last *cap* bytes.
+
+    A log that fits is copied whole. A longer one keeps its head and its tail
+    with a marker between them, because the line that matters can be at
+    either end: a browser that dies on launch writes its exit first, and one
+    that dies late writes it last. False when there was nothing to read; like
     ``CappedOutput``, a failure is evidence lost and nothing else."""
     cap = OUTPUT_CAP_BYTES if cap is None else cap
     try:
         with source.open("rb") as handle:
-            data = handle.read(cap)
-            more = bool(handle.read(1))
-            total = max(os.fstat(handle.fileno()).st_size, len(data) + more)
+            head = handle.read(cap)
+            total = os.fstat(handle.fileno()).st_size
+            tail = b""
+            if total > cap:
+                handle.seek(max(cap, total - cap))
+                tail = handle.read()
     except OSError:
         return False
     with contextlib.suppress(OSError):
         with destination.open("wb") as handle:
-            handle.write(data)
-            if more:
-                handle.write(b"\n" + _truncated(cap, total).encode())
+            handle.write(head)
+            if tail:
+                marker = (
+                    f"[truncated by the differential harness: the first {cap} bytes "
+                    f"of {total} are kept, and its last {len(tail)}, the middle "
+                    f"is not]\n"
+                )
+                handle.write(b"\n" + marker.encode())
+                handle.write(tail)
     return True
 
 
