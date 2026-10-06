@@ -1138,18 +1138,11 @@ def watcher_failures(
 _DRIVER_LINE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z pw:browser(?:\s|$)"
 )
+
+
 #: What the driver did with the browser, a few lines per launch. The text
 #: file keeps its head, so an exit that follows a storm of browser output is
 #: past the cap; these are what that exit has to leave in the event log.
-_DRIVER_LIFECYCLE = (
-    "<launching>",
-    "<process did exit",
-    "<gracefully close start>",
-    "<kill>",
-    "<will force kill>",
-)
-
-
 def driver_diagnostic(line: str) -> bool:
     """Whether *line* is the driver's browser log rather than the server's.
 
@@ -1160,11 +1153,22 @@ def driver_diagnostic(line: str) -> bool:
     return _DRIVER_LINE.match(line) is not None
 
 
+#: What the driver did with the browser, as it logs it: ``<launching>`` and
+#: ``[pid=N] <process did exit: ...>``, ``<gracefully close start>``,
+#: ``<kill>`` and ``<will force kill>``. The browser's own output is
+#: ``[pid=N][err]`` or ``[pid=N][out]`` and can quote the same words; that is
+#: chatter, one line per thing the browser prints, and it stays in the capped
+#: file. Measured in the locked drivers.
+_DRIVER_LIFECYCLE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z pw:browser "
+    r"(?:<launching> |\[pid=\d+\] <(?:"
+    r"process did exit|gracefully close start|will force kill|kill))"
+)
+
+
 def driver_lifecycle(line: str) -> bool:
     """A driver line that says it launched, closed, killed or saw the exit."""
-    return driver_diagnostic(line) and any(
-        marker in line for marker in _DRIVER_LIFECYCLE
-    )
+    return _DRIVER_LIFECYCLE.match(line) is not None
 
 
 def note_server_output(session: Any, line: str) -> None:

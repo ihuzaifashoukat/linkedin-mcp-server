@@ -1999,6 +1999,27 @@ def test_the_owner_log_is_copied_as_bytes(tmp_path, monkeypatch):
     assert marker in copied[1000:]
 
 
+async def test_browser_chatter_that_quotes_a_marker_stays_capped(
+    row, monkeypatch, tmp_path
+):
+    # The browser's own stderr is ``[pid=N][err]`` and can quote the driver's
+    # words. That is chatter, one line per print. The driver's own ``<kill>``
+    # is the record.
+    monkeypatch.setattr(events, "OUTPUT_CAP_BYTES", 1000)
+    chatter = "2026-10-05T00:00:00.000Z pw:browser [pid=7][err] <kill>"
+    killed = "2026-10-05T00:00:01.000Z pw:browser [pid=7] <kill>"
+
+    async def direct(**kwargs):
+        return await row(daemon=False, experiment="K1", **kwargs)
+
+    await _published_output(
+        direct, monkeypatch, tmp_path, [chatter] * 100 + [killed], []
+    )
+    recorded = (tmp_path / "evidence" / "events.jsonl").read_text()
+    assert chatter not in recorded
+    assert killed in recorded
+
+
 async def test_driver_diagnostics_fill_the_capped_file_and_not_the_event_log(
     row, monkeypatch, tmp_path
 ):
